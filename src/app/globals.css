@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: #FFF5F7;
+  --color-surface: #FFFFFF;
+  --color-surface-elevated: #FCE7F0;
+  --color-foreground: #4A1525;
+  --color-muted: #9E5A73;
+  --color-rose: #EC4899;
+  --color-rose-deep: #DB2777;
+  --color-rose-light: #FBCFE8;
+  --color-gold: #FB7185;
+  --color-gold-deep: #E11D48;
+  --color-border: #FBCFE8;
+
+  --font-sans: var(--font-plus-jakarta);
+  --font-serif: var(--font-playfair);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #FFF5F7;
+  color: #4A1525;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FFF5F7;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #FBCFE8;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #F472B6;
+}
+
+/* Selection */
+::selection {
+  background-color: rgba(244, 114, 182, 0.3);
+  color: #4A1525;
+}
+
+/* Smooth transitions for all interactive elements */
+a, button {
+  transition: all 0.2s ease;
+}
+
+/* Keyframes */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(232, 197, 200, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(232, 197, 200, 0.2);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(232, 197, 200, 0.05) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* Timeline connector line */
+.timeline-line {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, transparent, #F472B6, #EC4899, transparent);
+  transform: translateX(-50%);
+}
+
+/* Glass morphism effect for light theme */
+.glass {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(251, 207, 232, 0.8);
+  box-shadow: 0 4px 20px -2px rgba(244, 114, 182, 0.12);
+}
+
+/* Pink gradient text */
+.text-gradient-gold {
+  background: linear-gradient(135deg, #EC4899, #FB7185);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Rose gradient text */
+.text-gradient-rose {
+  background: linear-gradient(135deg, #DB2777, #EC4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
