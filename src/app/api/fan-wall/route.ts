@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, setDoc, doc, query, orderBy } from 'firebase/firestore';
 
 export const dynamic = 'force-dynamic';
-
-const PROJECT_ID = 'akankshafanwall';
-const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/fanMessages`;
 
 interface FanMessage {
   id: string;
@@ -36,30 +35,19 @@ function generateId(): string {
 
 export async function GET() {
   try {
-    const response = await fetch(FIRESTORE_URL, { cache: 'no-store' });
-    if (!response.ok) {
-      throw new Error('Failed to fetch from Firestore');
-    }
-    const data = await response.json();
+    const messagesRef = collection(db, 'fanMessages');
+    const q = query(messagesRef, orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(q);
     
-    const messages: FanMessage[] = (data.documents || []).map((doc: any) => {
-      const fields = doc.fields || {};
-      return {
-        id: fields.id?.stringValue || '',
-        fanId: fields.fanId?.stringValue || '',
-        displayName: fields.displayName?.stringValue || '',
-        message: fields.message?.stringValue || '',
-        createdAt: fields.createdAt?.stringValue || '',
-        cardSize: fields.cardSize?.stringValue || 'medium',
-      };
+    const messages: FanMessage[] = [];
+    querySnapshot.forEach((docSnap) => {
+      messages.push(docSnap.data() as FanMessage);
     });
-
-    // Sort descending by createdAt
-    messages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return NextResponse.json(messages);
   } catch (error) {
     console.error("Error fetching messages:", error);
+    // Return empty array on error instead of failing, to not break frontend
     return NextResponse.json([]);
   }
 }
@@ -88,40 +76,17 @@ export async function POST(request: NextRequest) {
     const sanitizedName = sanitize(displayName);
     const sanitizedMessage = sanitize(message);
     const newId = generateId();
-    const now = new Date().toISOString();
-    const cardSize = getCardSize(sanitizedMessage);
-
-    const firestorePayload = {
-      fields: {
-        id: { stringValue: newId },
-        fanId: { stringValue: fanId },
-        displayName: { stringValue: sanitizedName },
-        message: { stringValue: sanitizedMessage },
-        createdAt: { stringValue: now },
-        cardSize: { stringValue: cardSize }
-      }
-    };
-
-    const docUrl = `${FIRESTORE_URL}?documentId=${newId}`;
-    const response = await fetch(docUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(firestorePayload)
-    });
-
-    if (!response.ok) {
-      console.error("Firestore Error:", await response.text());
-      return NextResponse.json({ error: 'Database rejected the request. Check Security Rules.' }, { status: 500 });
-    }
 
     const newMessage: FanMessage = {
       id: newId,
-      fanId,
+      fanId: fanId,
       displayName: sanitizedName,
       message: sanitizedMessage,
-      createdAt: now,
-      cardSize
+      createdAt: new Date().toISOString(),
+      cardSize: getCardSize(sanitizedMessage),
     };
+
+    await setDoc(doc(db, 'fanMessages', newId), newMessage);
 
     return NextResponse.json(newMessage, { status: 201 });
   } catch (error) {
