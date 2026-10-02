@@ -1,32 +1,8 @@
-import { NextRequest } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, deleteDoc } from 'firebase/firestore';
 
 export const dynamic = 'force-dynamic';
-
-const DB_PATH = path.join(process.cwd(), 'data', 'fan-messages.json');
-
-interface FanMessage {
-  id: string;
-  fanId: string;
-  displayName: string;
-  message: string;
-  createdAt: string;
-  cardSize: 'small' | 'medium' | 'large';
-}
-
-function readMessages(): FanMessage[] {
-  try {
-    const data = fs.readFileSync(DB_PATH, 'utf-8');
-    return JSON.parse(data);
-  } catch {
-    return [];
-  }
-}
-
-function writeMessages(messages: FanMessage[]) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(messages, null, 2), 'utf-8');
-}
 
 export async function DELETE(
   request: NextRequest,
@@ -38,26 +14,28 @@ export async function DELETE(
     const { fanId } = body;
 
     if (!fanId) {
-      return Response.json({ error: 'Missing fanId' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing fanId' }, { status: 400 });
     }
 
-    const messages = readMessages();
-    const messageIndex = messages.findIndex(m => m.id === id);
+    const docRef = doc(db, 'fanMessages', id);
+    const docSnap = await getDoc(docRef);
 
-    if (messageIndex === -1) {
-      return Response.json({ error: 'Message not found' }, { status: 404 });
+    if (!docSnap.exists()) {
+      return NextResponse.json({ error: 'Message not found' }, { status: 404 });
     }
 
-    // Verify ownership — only the original author can delete
-    if (messages[messageIndex].fanId !== fanId) {
-      return Response.json({ error: 'Unauthorized' }, { status: 403 });
+    const messageData = docSnap.data();
+
+    // Verify ownership
+    if (messageData.fanId !== fanId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    messages.splice(messageIndex, 1);
-    writeMessages(messages);
+    await deleteDoc(docRef);
 
-    return Response.json({ success: true });
-  } catch {
-    return Response.json({ error: 'Invalid request' }, { status: 400 });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting message:", error);
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 }

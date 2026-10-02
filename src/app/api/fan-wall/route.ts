@@ -1,10 +1,8 @@
-import { NextRequest } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, setDoc, doc, query, orderBy } from 'firebase/firestore';
 
 export const dynamic = 'force-dynamic';
-
-const DB_PATH = path.join(process.cwd(), 'data', 'fan-messages.json');
 
 interface FanMessage {
   id: string;
@@ -13,23 +11,6 @@ interface FanMessage {
   message: string;
   createdAt: string;
   cardSize: 'small' | 'medium' | 'large';
-}
-
-function readMessages(): FanMessage[] {
-  try {
-    const data = fs.readFileSync(DB_PATH, 'utf-8');
-    return JSON.parse(data);
-  } catch {
-    return [];
-  }
-}
-
-function writeMessages(messages: FanMessage[]) {
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(DB_PATH, JSON.stringify(messages, null, 2), 'utf-8');
 }
 
 function sanitize(input: string): string {
@@ -53,9 +34,22 @@ function generateId(): string {
 }
 
 export async function GET() {
-  const messages = readMessages();
-  messages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  return Response.json(messages);
+  try {
+    const messagesRef = collection(db, 'fanMessages');
+    const q = query(messagesRef, orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    
+    const messages: FanMessage[] = [];
+    querySnapshot.forEach((docSnap) => {
+      messages.push(docSnap.data() as FanMessage);
+    });
+
+    return NextResponse.json(messages);
+  } catch (error) {
+    console.error("Error fetching messages:", error);
+    // Return empty array on error instead of failing, to not break frontend
+    return NextResponse.json([]);
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -64,26 +58,27 @@ export async function POST(request: NextRequest) {
     const { fanId, displayName, message } = body;
 
     if (!fanId || typeof fanId !== 'string') {
-      return Response.json({ error: 'Missing fanId' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing fanId' }, { status: 400 });
     }
     if (!displayName || typeof displayName !== 'string' || displayName.trim().length === 0) {
-      return Response.json({ error: 'Name is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
-      return Response.json({ error: 'Message is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
     if (message.length > 500) {
-      return Response.json({ error: 'Message too long' }, { status: 400 });
+      return NextResponse.json({ error: 'Message too long' }, { status: 400 });
     }
     if (displayName.length > 50) {
-      return Response.json({ error: 'Name too long' }, { status: 400 });
+      return NextResponse.json({ error: 'Name too long' }, { status: 400 });
     }
 
     const sanitizedName = sanitize(displayName);
     const sanitizedMessage = sanitize(message);
+    const newId = generateId();
 
     const newMessage: FanMessage = {
-      id: generateId(),
+      id: newId,
       fanId: fanId,
       displayName: sanitizedName,
       message: sanitizedMessage,
@@ -91,12 +86,11 @@ export async function POST(request: NextRequest) {
       cardSize: getCardSize(sanitizedMessage),
     };
 
-    const messages = readMessages();
-    messages.push(newMessage);
-    writeMessages(messages);
+    await setDoc(doc(db, 'fanMessages', newId), newMessage);
 
-    return Response.json(newMessage, { status: 201 });
-  } catch {
-    return Response.json({ error: 'Invalid request' }, { status: 400 });
+    return NextResponse.json(newMessage, { status: 201 });
+  } catch (error) {
+    console.error("Error saving message:", error);
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 }
